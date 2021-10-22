@@ -4,11 +4,12 @@ from fastapi import FastAPI, File, UploadFile
 from typing import List
 import uvicorn
 import shutil
-from predicts.wav2vec2_predict_services import Wav2vec2_Predict_Services
+from predicts.wav2vec2_predict_services import init_services
 from fastapi.encoders import jsonable_encoder
 
 app = FastAPI(title='Malay-Speech Recognization', version='1.0',
-              description='wav2vec2 model is used for prediction') #
+              description='wav2vec2 models is used for prediction')  #
+
 
 # class Data(BaseModel):
 #     file_path: FilePath
@@ -20,6 +21,7 @@ def read_home():
      Home endpoint which can be used to test the availability of the application.
      """
     return {'message': 'System is healthy'}
+
 
 @app.post("/predict")
 def predict(file: UploadFile = File(...)):
@@ -36,7 +38,7 @@ def predict(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
 
     # instantiate keyword spotting service singleton and get prediction
-    wps = Wav2vec2_Predict_Services()
+    wps = init_services()
     predicted_word = wps.predict(file_name)
 
     # we don't need the audio file any more - let's delete it!
@@ -62,7 +64,7 @@ def predict(files: List[UploadFile] = File(...)):
             ]
     	"""
 
-    wps = Wav2vec2_Predict_Services()
+    wps = init_services()
     # get file from POST request and save itpp
     results = []
     for data in files:
@@ -85,4 +87,4 @@ def predict(files: List[UploadFile] = File(...)):
 
 
 if __name__ == '__main__':
-    uvicorn.run("fastapi_server:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)

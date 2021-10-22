@@ -1,4 +1,3 @@
-#import malaya_speech
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 from ctcdecode import CTCBeamDecoder
 import soundfile as sf
@@ -12,8 +11,8 @@ import os
 MAX_LENGTH = 22050
 SAMPLE_RATE = 16000
 
-class _Wav2vec2_Predict_Services:
 
+class Wav2vec2PredictServices:
     model = None
     processor = None
     vocab = None
@@ -23,8 +22,8 @@ class _Wav2vec2_Predict_Services:
 
     def predict(self, file_path):
         """
-        :param file_path (str): Path to audio file to predict
-        :return predicted_keyword (str): Keyword predicted by the model
+        :param file_path: Path to audio file to predict
+        :return predicted_keyword (str): Keyword predicted by the models
         """
 
         # extract MFCC
@@ -39,15 +38,16 @@ class _Wav2vec2_Predict_Services:
         predicts = pred_with_lm.strip()
 
         print("pred_label: ", predicts)
-        # predictions = self.model.predict([signal],decoder = 'beam', beam_size = 5)
+        # predictions = self.models.predict([signal],decoder = 'beam', beam_size = 5)
         # print(predictions)
         # predicted_keyword = predictions[0]
         return predicts
 
-
-    def preprocess(self, file_path):
+    @staticmethod
+    def preprocess(file_path):
         """Extract MFCCs from audio file.
-        :param file_path (str): Path of audio file
+        :param file_path: (str): Path of audio file
+        :return signal: (np.array): array of speech signal
         """
 
         # load audio file
@@ -56,41 +56,46 @@ class _Wav2vec2_Predict_Services:
         return signal
 
 
-def Wav2vec2_Predict_Services():
+def init_services():
     """Factory function for Keyword_Spotting_Service class.
     :return _Keyword_Spotting_Service._instance (_Keyword_Spotting_Service):
     """
 
     # ensure an instance is created only the first time the factory function is called
-    if _Wav2vec2_Predict_Services._instance is None:
-        _Wav2vec2_Predict_Services._instance = _Wav2vec2_Predict_Services()
-        _Wav2vec2_Predict_Services.model = Wav2Vec2ForCTC.from_pretrained("/home/sanhlx/PycharmProjects/wav2vec2-malay/deploy_web/models/w2v_xlsr_model/checkpoint-54075")
-        _Wav2vec2_Predict_Services.processor = Wav2Vec2Processor.from_pretrained("/home/sanhlx/PycharmProjects/wav2vec2-malay/deploy_web/models/w2v_xlsr_model/checkpoint-54075")
+    if Wav2vec2PredictServices._instance is None:
+        Wav2vec2PredictServices._instance = Wav2vec2PredictServices()
+        Wav2vec2PredictServices.model = Wav2Vec2ForCTC.from_pretrained(
+            "./models/w2v_xlsr_model/checkpoint-54075")
+        Wav2vec2PredictServices.processor = Wav2Vec2Processor.from_pretrained(
+            "./models/w2v_xlsr_model/checkpoint-54075")
 
-        _Wav2vec2_Predict_Services.vocab = _Wav2vec2_Predict_Services.processor.tokenizer.convert_ids_to_tokens(range(0, _Wav2vec2_Predict_Services.processor.tokenizer.vocab_size))
-        space_ix = _Wav2vec2_Predict_Services.vocab.index('|')
-        _Wav2vec2_Predict_Services.vocab[space_ix] = ' '
-        with open(os.path.join("/home/sanhlx/PycharmProjects/wav2vec2-malay/deploy_web/lm", "config_ctc.yaml"), 'r') as config_file:
-            _Wav2vec2_Predict_Services.ctc_lm_params = yaml.load(config_file, Loader=yaml.FullLoader)
-        _Wav2vec2_Predict_Services.kenlm_ctcdecoder = CTCBeamDecoder(_Wav2vec2_Predict_Services.vocab,
-                                          model_path="/home/sanhlx/PycharmProjects/wav2vec2-malay/deploy_web/lm/malay_lm.bin",
-                                          alpha=_Wav2vec2_Predict_Services.ctc_lm_params['alpha'],
-                                          beta=_Wav2vec2_Predict_Services.ctc_lm_params['beta'],
-                                          cutoff_top_n=40,
-                                          cutoff_prob=1.0,
-                                          beam_width=100,
-                                          num_processes=4,
-                                          blank_id=_Wav2vec2_Predict_Services.processor.tokenizer.pad_token_id,
-                                          log_probs_input=True
-                                          )
-    return _Wav2vec2_Predict_Services._instance
+        Wav2vec2PredictServices.vocab = Wav2vec2PredictServices.processor.tokenizer.convert_ids_to_tokens(
+            range(0, Wav2vec2PredictServices.processor.tokenizer.vocab_size))
+        space_ix = Wav2vec2PredictServices.vocab.index('|')
+        Wav2vec2PredictServices.vocab[space_ix] = ' '
+        with open(os.path.join("./lm", "config_ctc.yaml"),
+                  'r') as config_file:
+            Wav2vec2PredictServices.ctc_lm_params = yaml.load(config_file, Loader=yaml.FullLoader)
+        Wav2vec2PredictServices.kenlm_ctcdecoder = CTCBeamDecoder(Wav2vec2PredictServices.vocab,
+                                                                  model_path="./lm/malay_lm.bin",
+                                                                  alpha=Wav2vec2PredictServices.ctc_lm_params[
+                                                                         'alpha'],
+                                                                  beta=Wav2vec2PredictServices.ctc_lm_params[
+                                                                         'beta'],
+                                                                  cutoff_top_n=40,
+                                                                  cutoff_prob=1.0,
+                                                                  beam_width=100,
+                                                                  num_processes=4,
+                                                                  blank_id=Wav2vec2PredictServices.processor.tokenizer.pad_token_id,
+                                                                  log_probs_input=True
+                                                                  )
+    return Wav2vec2PredictServices._instance
 
 
 if __name__ == "__main__":
-
     # create 2 instances of the keyword spotting service
-    wps = Wav2vec2_Predict_Services()
-    wps1 = Wav2vec2_Predict_Services()
+    wps = init_services()
+    wps1 = init_services()
 
     # check that different instances of the keyword spotting service point back to the same object (singleton)
     assert wps is wps1
