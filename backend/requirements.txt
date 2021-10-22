@@ -1,1 +1,11 @@
-
+fastapi[all]~=0.70.0
+transformers~=4.11.3
+torch~=1.10.0
+soundfile~=0.10.3.post1
+streamlit
+numpy~=1.21.3
+ipython~=7.28.0
+PyYAML~=5.4.1
+uvicorn~=0.15.0
+setuptools~=57.0.0
+Pillow~=8.4.0

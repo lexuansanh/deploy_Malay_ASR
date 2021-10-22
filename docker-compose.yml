@@ -1,0 +1,17 @@
+version: '3.9'
+
+services:
+  frontend:
+    build: w2v2_frontend:v1
+    ports:
+      - 8501:8501
+    depends_on:
+      - w2v2_backend:v1
+    volumes:
+        - ./storage:/storage
+  backend:
+    build: w2v2_backend:v1
+    ports:
+      - 8080:8080
+    volumes:
+      - ./storage:/storage

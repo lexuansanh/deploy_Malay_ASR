@@ -2,7 +2,7 @@ import requests
 import time
 import os
 # server url
-URL = "http://0.0.0.0:8000/predict"
+URL = "http://0.0.0.0:8080/predict"
 
 
 # audio file we'd like to send for predicting keyword/home/sanhlx/PycharmProjects/wav2vec2-malay/tests
