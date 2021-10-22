@@ -1,1 +1,3 @@
 ctcdecode/
+backend/model/w2v_xlsr_model/checkpoint-54075/pytorch_model.bin
+backend/lm/malay_lm.bin
