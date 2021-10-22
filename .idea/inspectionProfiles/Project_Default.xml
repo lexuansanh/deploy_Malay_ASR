@@ -1,0 +1,30 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <value>
+          <list size="17">
+            <item index="0" class="java.lang.String" itemvalue="transformers" />
+            <item index="1" class="java.lang.String" itemvalue="jiwer" />
+            <item index="2" class="java.lang.String" itemvalue="unidecode" />
+            <item index="3" class="java.lang.String" itemvalue="lang-trans" />
+            <item index="4" class="java.lang.String" itemvalue="torch" />
+            <item index="5" class="java.lang.String" itemvalue="google" />
+            <item index="6" class="java.lang.String" itemvalue="datasets" />
+            <item index="7" class="java.lang.String" itemvalue="numpy" />
+            <item index="8" class="java.lang.String" itemvalue="torchvision" />
+            <item index="9" class="java.lang.String" itemvalue="pandas" />
+            <item index="10" class="java.lang.String" itemvalue="augment" />
+            <item index="11" class="java.lang.String" itemvalue="pyyaml" />
+            <item index="12" class="java.lang.String" itemvalue="wandb" />
+            <item index="13" class="java.lang.String" itemvalue="librosa" />
+            <item index="14" class="java.lang.String" itemvalue="audiomentations" />
+            <item index="15" class="java.lang.String" itemvalue="torchaudio" />
+            <item index="16" class="java.lang.String" itemvalue="yaml" />
+          </list>
+        </value>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>
