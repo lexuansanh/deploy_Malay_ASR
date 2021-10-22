@@ -1,0 +1,5 @@
+fastapi[all]
+transformers
+torch
+soundfile
+streamlit
