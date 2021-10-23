@@ -1,5 +1,6 @@
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 from ctcdecode import CTCBeamDecoder
+from pydub import AudioSegment
 import soundfile as sf
 import yaml
 import torch
@@ -8,7 +9,7 @@ import json
 import os
 
 # SAVED_MODEL_PATH = "wav2vec2-conformer-large"
-MAX_LENGTH = 22050
+MAX_LENGTH = 160000
 SAMPLE_RATE = 16000
 
 
@@ -28,6 +29,9 @@ class Wav2vec2PredictServices:
 
         # extract MFCC
         signal = self.preprocess(file_path)
+        print(np.shape(signal))
+        if len(signal) >= MAX_LENGTH:
+            signal = signal[:MAX_LENGTH]
         inputs = self.processor(signal, sampling_rate=16_000, return_tensors="pt", padding=True)
         with torch.no_grad():
             logits = self.model(inputs.input_values, attention_mask=inputs.attention_mask).logits
@@ -43,17 +47,24 @@ class Wav2vec2PredictServices:
         # predicted_keyword = predictions[0]
         return predicts
 
-    @staticmethod
-    def preprocess(file_path):
+    def preprocess(self, file_path):
         """Extract MFCCs from audio file.
         :param file_path: (str): Path of audio file
         :return signal: (np.array): array of speech signal
         """
-
         # load audio file
-        signal, sample_rate = sf.read(file_path)
-
-        return signal
+        if ".mp3" in file_path:
+            print(file_path)
+            audio = AudioSegment.from_file(file_path)
+            file_name = file_path.replace(".mp3", ".wav")
+            print(file_name)
+            audio = audio.set_frame_rate(SAMPLE_RATE).set_channels(1)
+            audio.export(file_name, format="wav")
+            signal, sample_rate = sf.read(file_name)
+            return signal
+        else:
+            signal, sample_rate = sf.read(file_path)
+            return signal
 
 
 def init_services():

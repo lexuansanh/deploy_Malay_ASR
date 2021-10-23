@@ -9,3 +9,5 @@ PyYAML~=5.4.1
 uvicorn~=0.15.0
 setuptools~=57.0.0
 Pillow~=8.4.0
+pydub
+pydantic

@@ -32,7 +32,10 @@ if "duration_scope" not in st.session_state:
     st.session_state.duration_scope = 240
 if "augmentation" not in st.session_state:
     st.session_state.augmentation = {"duration_scope": 240, "filter": [False, False, False]}
-
+if "transcribe" not in st.session_state:
+    st.session_state.transcribe = 0
+if "upfile_complete" not in st.session_state:
+    st.session_state.upfile_complete = 0
 ###############################
 # Config
 ###############################
@@ -157,7 +160,7 @@ if tool_sidebar == "Audio Transcription":
     # Main components
     audio_file = None
     data = {"word": ""}
-    file = {}
+
     with st.expander("Get Audio", expanded=True):
         with st.form("info_form"):
             col1, col2 = st.columns((1, 1))
@@ -166,22 +169,27 @@ if tool_sidebar == "Audio Transcription":
             _submitted = st.form_submit_button("OK")
             if _submitted:
                 st.session_state.submit = 1
+                st.session_state.transcribe = 0
+                st.session_state.upfile_complete = 0
             if st.session_state.audio_file is not None and st.session_state.submit == 1:
-                    # time.sleep(0.5)
+                # time.sleep(0.5)
                 file_details = [f"Filename: {st.session_state.audio_file.name}",
                                 f"FileType: {st.session_state.audio_file.type}",
                                 f"FileSize: {st.session_state.audio_file.size} bytes"]
                 for file_de in file_details:
                     col2.info(file_de)
                 col1.audio(st.session_state.audio_file)
-                values = {"file": (st.session_state.audio_file.name, st.session_state.audio_file, "audio/wav")}
-                response = requests.post(f"{URL}/upfile", files=values)
-                st.session_state.file = response.json()
+                if st.session_state.upfile_complete == 0:
+                    values = {"file": (st.session_state.audio_file.name, st.session_state.audio_file, "audio/wav")}
+                    response = requests.post(f"{URL}/upfile", files=values)
+                    st.session_state.file = response.json()
+                    st.session_state.upfile_complete = 1
 
     trans_btn = st.button("Transcribe")
     if trans_btn and st.session_state.file["file_name"] != "":
         response = requests.post(f"{URL}/predict", json=st.session_state.file)
         data = response.json()
+        st.session_state.transcribe = 1
 
         # st.markdown('**Processing**...')
         # my_bar = st.progress(0)
