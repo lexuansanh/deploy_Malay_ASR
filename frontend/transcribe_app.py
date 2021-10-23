@@ -16,16 +16,23 @@ current_time = now.strftime("%H:%M:%S")
 
 URL = "http://0.0.0.0:8080"
 
+if "file" not in st.session_state:
+    st.session_state.file = {"file_name": ""}
+if "audio_file" not in st.session_state:
+    st.session_state.audio_file = None
+if "submit" not in st.session_state:
+    st.session_state.submit = 0
+if "noise" not in st.session_state:
+    st.session_state.noise = False
+if "noise2" not in st.session_state:
+    st.session_state.noise2 = False
+if "noise3" not in st.session_state:
+    st.session_state.noise3 = False
+if "duration_scope" not in st.session_state:
+    st.session_state.duration_scope = 240
+if "augmentation" not in st.session_state:
+    st.session_state.augmentation = {"duration_scope": 240, "filter": [False, False, False]}
 
-class Data():
-    def __init__(self):
-        self.file = {}
-
-    def getitem(self):
-        return self.file
-
-
-data_save = Data()
 ###############################
 # Config
 ###############################
@@ -118,7 +125,7 @@ tool_sidebar = st.sidebar.selectbox(
 )
 ###############################
 # Sidebar
-global file
+
 
 if tool_sidebar == "Audio Transcription":
     with st.form(key="main_form"):
@@ -126,12 +133,11 @@ if tool_sidebar == "Audio Transcription":
             with st.expander("Settings"):
                 with st.form("info_transcribe_form"):
                     st.markdown("**Transcription Information**")
-                    slider_val = st.slider("Max Duration", min_value=1, max_value=240)
+                    st.session_state.duration_scope = st.slider("Max Duration", min_value=1, max_value=240)
                     st.markdown("**Filter**")
-                    checkbox_val = st.checkbox("Noise")
-                    checkbox_val = st.checkbox("Noise2")
-                    checkbox_val = st.checkbox("Noise3")
-
+                    st.session_state.noise = st.checkbox("Noise")
+                    st.session_state.noise2 = st.checkbox("Noise2")
+                    st.session_state.noise3 = st.checkbox("Noise3")
                     user_word = st.text_input("Enter a keyword", "...")
                     select_language = st.radio('Language', ('All', 'English', 'Malaysia'))
                     include_retweets = st.checkbox('Include retweets in data')
@@ -139,11 +145,12 @@ if tool_sidebar == "Audio Transcription":
 
                     sidebar_submitted = st.form_submit_button("Done")
                     if sidebar_submitted:
-                        st.write(f"Duration scope: {slider_val}s")
-                        st.write("Filter:", checkbox_val)
+                        st.write(f"Duration scope: {st.session_state.duration_scope}s")
+                        st.write("Filter:", [st.session_state.noise, st.session_state.noise2, st.session_state.noise3])
 
             main_submitted = st.form_submit_button("Save")
             if main_submitted:
+                st.session_state.augmentation = {"duration_scope": st.session_state.duration_scope, "filter": [st.session_state.noise, st.session_state.noise2, st.session_state.noise3]}
                 st.success("Saved")
 
     ###############################
@@ -154,31 +161,28 @@ if tool_sidebar == "Audio Transcription":
     with st.expander("Get Audio", expanded=True):
         with st.form("info_form"):
             col1, col2 = st.columns((1, 1))
-            audio_file = col1.file_uploader("Upload audio", type=['wav', 'mp3'])
+            st.session_state.audio_file = col1.file_uploader("Upload audio", type=['wav', 'mp3'])
             col2.markdown("Audio Information")
             _submitted = st.form_submit_button("OK")
             if _submitted:
-                if audio_file is not None:
+                st.session_state.submit = 1
+            if st.session_state.audio_file is not None and st.session_state.submit == 1:
                     # time.sleep(0.5)
-                    file_details = [f"Filename: {audio_file.name}",
-                                    f"FileType: {audio_file.type}",
-                                    f"FileSize: {audio_file.size} bytes"]
-                    for file_de in file_details:
-                        col2.info(file_de)
-                    col1.audio(audio_file)
-                    values = {"file": (audio_file.name, audio_file, "audio/wav")}
-                    response = requests.post(f"{URL}/upfile", files=values)
-                    data_save.file = response.json()
-                    print(data_save.file)
+                file_details = [f"Filename: {st.session_state.audio_file.name}",
+                                f"FileType: {st.session_state.audio_file.type}",
+                                f"FileSize: {st.session_state.audio_file.size} bytes"]
+                for file_de in file_details:
+                    col2.info(file_de)
+                col1.audio(st.session_state.audio_file)
+                values = {"file": (st.session_state.audio_file.name, st.session_state.audio_file, "audio/wav")}
+                response = requests.post(f"{URL}/upfile", files=values)
+                st.session_state.file = response.json()
 
-        requests_file = data_save.getitem()
-        print(requests_file)
-        trans_btn = st.button("Transcribe")
-        if trans_btn:
-            print(requests_file)
-            response = requests.post(f"{URL}/predict", json=requests_file)
-            data = response.json()
-            print(data)
+    trans_btn = st.button("Transcribe")
+    if trans_btn and st.session_state.file["file_name"] != "":
+        response = requests.post(f"{URL}/predict", json=st.session_state.file)
+        data = response.json()
+
         # st.markdown('**Processing**...')
         # my_bar = st.progress(0)
         # #package stuff to send and perform POST request
@@ -186,7 +190,7 @@ if tool_sidebar == "Audio Transcription":
         #     time.sleep(0.1)
         #     my_bar.progress(percent + 1)
 
-    transcript_result = st.text_area("Text Transcript", value=data, height=400)
+    transcript_result = st.text_area("Text Transcript", value=data["word"], height=400)
 
     if transcript_result is not None:
         data_down = transcript_result.strip()
