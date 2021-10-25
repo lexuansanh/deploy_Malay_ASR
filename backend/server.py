@@ -15,14 +15,28 @@ app = FastAPI(title='Malay-Speech Recognition', version='1.0',
 
 
 class Data(BaseModel):
-    file_name: str
+    model: str
+    lm: str
+
+
+class Arg:
+    def __init__(self, model, lm):
+        self.model = model
+        self.lm = lm
+
+    def __setitem__(self, model, lm):
+        self.model = model
+        self.lm = lm
+
+    def __getitem__(self):
+        return {"model": self.model, "lm": self.lm}
 
 
 # init_prediction_services:
 
 
 AUDIO_DIR = "./audio"
-
+arg = Arg("model1", "4-gram")
 
 @app.get('/')
 @app.get('/home')
@@ -33,7 +47,7 @@ def read_home():
     return {'message': 'System is healthy'}
 
 
-@app.post("/predict")
+@app.post("/predict_old")
 def predict(file: Data):
     """Endpoint to predict keyword
         :return (json): This endpoint returns a json file with the following format:
@@ -41,15 +55,12 @@ def predict(file: Data):
                 "word": "satu dua tiga"
             }
     """
-
     data = file.dict()
     # get file from POST request and save itpp
     # file_name = str(random.randint(0, 100000))
     # with open(file_name, "wb") as buffer:
     #     shutil.copyfileobj(file.file, buffer)
-
     # instantiate keyword spotting service singleton and get prediction
-
     file_name = os.path.join(AUDIO_DIR, data["file_name"])
     wps = init_services()
     predicted_word = wps.predict(file_name)
@@ -63,14 +74,14 @@ def predict(file: Data):
     return jsonable_encoder(result)
 
 
-@app.post("/upfile")
-def predict(file: UploadFile = File(...)):
+@app.post("/predict")
+def up_file(file: UploadFile = File(...)):
     """Endpoint to predict keyword
         :return (json):  json file with the following format:
             {
                 "file_name": "24567.wav"
             }
-    	"""
+    """
 
     # get file from POST request and save itpp
     file_name = ""
@@ -83,41 +94,23 @@ def predict(file: UploadFile = File(...)):
     with open(os.path.join(AUDIO_DIR, file_name), "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # instantiate keyword spotting service singleton and get prediction
-    return jsonable_encoder({"file_name": file_name})
-
-
-@app.post("/longpredict")
-def predict(files: List[UploadFile] = File(...)):
-    """Endpoint to predict keyword
-        :return (json): This endpoint returns a json file with the following format:
-            [
-            {
-                "word": "satu dua tiga lima enam empat ...end"
-            }
-            ]
-    """
-
+    cache_file = os.path.join(AUDIO_DIR, file_name)
     wps = init_services()
-    # get file from POST request and save itpp
-    results = []
-    for data in files:
-        file_name = str(random.randint(0, 100000))
-        with open(file_name, "wb") as buffer:
-            shutil.copyfileobj(data.file, buffer)
+    arg_dict = arg.__getitem__()
+    predicted_word = wps.predict(cache_file, arg_dict)
 
-        # instantiate keyword spotting service singleton and get prediction
+    # instantiate keyword spotting service singleton and get prediction
+    result = {"word": predicted_word}
 
-        predicted_word = wps.predict(file_name)
+    return jsonable_encoder(result)
 
-        # we don't need the audio file any more - let's delete it!
-        os.remove(file_name)
 
-        # send back result as a json file
-        result = {"word": predicted_word}
-        results.append(result)
-
-    return jsonable_encoder(results)
+@app.post("/arg")
+def predict_arg(file: Data):
+    data = file.dict()
+    arg.__setitem__(data["model"], data["lm"])
+    result = {"result": arg.__getitem__()}
+    return jsonable_encoder(result)
 
 
 if __name__ == '__main__':
