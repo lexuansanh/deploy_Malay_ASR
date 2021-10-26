@@ -16,49 +16,53 @@ SAMPLE_RATE = 16000
 
 
 # dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-
 class Wav2vec2PredictServices:
-    model = None
-    processor = None
-    vocab = None
-    ctc_lm_params = None
-    kenlm_ctcdecoder = None
-    _instance = None
+    model = {}
+    processor = {}
+    vocab = {}
+    ctc_lm_params = {}
+    kenlm_ctcdecoder = {}
+    _instance = {}
 
-    def predict(self, file_path, kind_dict):
+    def predict(self, file_path, pattern_dict):
         """
-        :param kind_dict: some options about models and lms
         :param file_path: Path to audio file to predict
+        :param pattern_dict: some options about models and lms
         :return predicted_keyword (str): Keyword predicted by the models
         """
 
         start_time = time()
+        # Choice model for prediction
+        processor = self.processor[pattern_dict["model"]]
+        model = self.model[pattern_dict["model"]]
+        vocab = self.vocab[pattern_dict["model"]]
+        kenlm_ctcdecoder = self.kenlm_ctcdecoder[pattern_dict["model"]]
+
+        # preprocess audio file
         audio_data = self._preprocess(file_path)
-        results = ""
         array_signal = self._split_array(audio_data)
+        results = ""
+
+        # predict with model and decode
         for signal in array_signal:
             predicts = ""
-            inputs = self.processor(signal, sampling_rate=16_000, return_tensors="pt", padding=True)
-
+            inputs = processor(signal, sampling_rate=16_000, return_tensors="pt", padding=True)
             with torch.no_grad():
-                logits = self.model(inputs.input_values, attention_mask=inputs.attention_mask).logits
-            if kind_dict["lm"] == "none":
-                predicted_ids = torch.argmax(logits, dim=-1)
-                predicts = self.processor.decode(predicted_ids[0])
+                logits = model(inputs.input_values, attention_mask=inputs.attention_mask).logits
+
             # get the predicted label
-            elif kind_dict["lm"] == "4-gram":
-                beam_results, beam_scores, timesteps, out_lens = self.kenlm_ctcdecoder.decode(logits)
-                # for i in range(len(beam_results)):
-                pred_with_lm = "".join(self.vocab[n] for n in beam_results[0][0][:out_lens[0][0]])
+            if pattern_dict["lm"] == 'CTC':
+                predicted_ids = torch.argmax(logits, dim=-1)
+                predicts = processor.decode(predicted_ids[0])
+            elif pattern_dict["lm"] == 'CTC + 4-gram':
+                beam_results, beam_scores, timesteps, out_lens = kenlm_ctcdecoder.decode(logits)
+                pred_with_lm = "".join(vocab[n] for n in beam_results[0][0][:out_lens[0][0]])
                 predicts = pred_with_lm.strip()
             results += predicts
             results += " "
             print("pred_label: ", predicts)
-        # predictions = self.models.predict([signal],decoder = 'beam', beam_size = 5)
-        # print(predictions)
-        # predicted_keyword = predictions[0]
         predict_time = time() - start_time
-        results += f" (predict_time: {predict_time} s)"
+        # results += f" (predict_time: {predict_time} s)"
 
         return results.strip()
 
@@ -73,19 +77,25 @@ class Wav2vec2PredictServices:
             audio = AudioSegment.from_file(file_path)
             file_name = file_path.replace(".mp3", ".wav")
             print(file_name)
-            audio = audio.set_frame_rate(44100).set_channels(1)
+            audio = audio.set_frame_rate(16000).set_channels(1)
             audio.export(file_name, format="wav")
-            signal, sample_rate = sf.read(file_name)
+            signal, sample_rate = librosa.load(file_name, sr=SAMPLE_RATE, mono=True)
             print("sample_rate", sample_rate)
-            signal = self._resample_if_necessary(signal, sample_rate)
+            #signal = self._resample_if_necessary(signal, sample_rate)
             return signal
         else:
-            signal, sample_rate = sf.read(file_path)
-            signal = self._resample_if_necessary(signal, sample_rate)
+            signal, sample_rate = librosa.load(file_path, sr=SAMPLE_RATE, mono=True)
+            # signal = self._resample_if_necessary(signal, sample_rate)
             return signal
 
     @staticmethod
     def _resample_if_necessary(signal, sr):
+        """
+        :param signal: audio data (np.array or list)
+        :param sr: sampling rate (int)
+        :return: signal(np.array) with fixed sampling rate(16000)
+        """
+
         if sr != SAMPLE_RATE:
             signal = librosa.resample(signal, sr, SAMPLE_RATE)
         return signal
@@ -107,50 +117,51 @@ class Wav2vec2PredictServices:
             return array_signal
 
 
-def init_services():
-    """Factory function for Keyword_Spotting_Service class.
-    :return _Keyword_Spotting_Service._instance (_Keyword_Spotting_Service):
+def init_services(model_pattern):
+    """Factory function for Wav2vec2PredictServices class.
+    :return Wav2vec2PredictServices._instance (model_pattern):
     """
-
     # ensure an instance is created only the first time the factory function is called
-    if Wav2vec2PredictServices._instance is None:
-        Wav2vec2PredictServices._instance = Wav2vec2PredictServices()
-        Wav2vec2PredictServices.model = Wav2Vec2ForCTC.from_pretrained(
-            "./models/w2v_xlsr_model/checkpoint-54075")
-        Wav2vec2PredictServices.processor = Wav2Vec2Processor.from_pretrained(
-            "./models/w2v_xlsr_model/checkpoint-54075")
+    if model_pattern not in Wav2vec2PredictServices._instance.keys():
+        Wav2vec2PredictServices._instance[model_pattern] = Wav2vec2PredictServices()
+        Wav2vec2PredictServices.model[model_pattern] = Wav2Vec2ForCTC.from_pretrained(
+            f"./models/{model_pattern}")
+        Wav2vec2PredictServices.processor[model_pattern] = Wav2Vec2Processor.from_pretrained(
+            f"./models/{model_pattern}")
 
-        Wav2vec2PredictServices.vocab = Wav2vec2PredictServices.processor.tokenizer.convert_ids_to_tokens(
-            range(0, Wav2vec2PredictServices.processor.tokenizer.vocab_size))
-        space_ix = Wav2vec2PredictServices.vocab.index('|')
-        Wav2vec2PredictServices.vocab[space_ix] = ' '
-        with open(os.path.join("./lm", "config_ctc.yaml"),
+        Wav2vec2PredictServices.vocab[model_pattern] = Wav2vec2PredictServices.processor[
+            model_pattern].tokenizer.convert_ids_to_tokens(
+            range(0, Wav2vec2PredictServices.processor[model_pattern].tokenizer.vocab_size))
+        space_ix = Wav2vec2PredictServices.vocab[model_pattern].index('|')
+        Wav2vec2PredictServices.vocab[model_pattern][space_ix] = ' '
+        with open(os.path.join(f"./models/{model_pattern}/lm", "config_ctc.yaml"),
                   'r') as config_file:
-            Wav2vec2PredictServices.ctc_lm_params = yaml.load(config_file, Loader=yaml.FullLoader)
-        Wav2vec2PredictServices.kenlm_ctcdecoder = CTCBeamDecoder(Wav2vec2PredictServices.vocab,
-                                                                  model_path="./lm/malay_lm.bin",
-                                                                  alpha=Wav2vec2PredictServices.ctc_lm_params[
-                                                                      'alpha'],
-                                                                  beta=Wav2vec2PredictServices.ctc_lm_params[
-                                                                      'beta'],
-                                                                  cutoff_top_n=40,
-                                                                  cutoff_prob=1.0,
-                                                                  beam_width=100,
-                                                                  num_processes=4,
-                                                                  blank_id=Wav2vec2PredictServices.processor.tokenizer.pad_token_id,
-                                                                  log_probs_input=True
-                                                                  )
-    return Wav2vec2PredictServices._instance
+            Wav2vec2PredictServices.ctc_lm_params[model_pattern] = yaml.load(config_file, Loader=yaml.FullLoader)
+        Wav2vec2PredictServices.kenlm_ctcdecoder[model_pattern] = CTCBeamDecoder(
+            Wav2vec2PredictServices.vocab[model_pattern],
+            model_path=f"./models/{model_pattern}/lm/malay_lm.bin",
+            alpha=Wav2vec2PredictServices.ctc_lm_params[model_pattern][
+                'alpha'],
+            beta=Wav2vec2PredictServices.ctc_lm_params[model_pattern][
+                'beta'],
+            cutoff_top_n=40,
+            cutoff_prob=1.0,
+            beam_width=100,
+            num_processes=4,
+            blank_id=Wav2vec2PredictServices.processor[model_pattern].tokenizer.pad_token_id,
+            log_probs_input=True
+        )
+    return Wav2vec2PredictServices._instance[model_pattern]
 
 
 if __name__ == "__main__":
-    # create 2 instances of the keyword spotting service
-    wps = init_services()
-    wps1 = init_services()
+    # create 2 instances of the Wav2vec2PredictServices
+    wps = init_services("model1")
+    wps1 = init_services("model1")
 
-    # check that different instances of the keyword spotting service point back to the same object (singleton)
+    # check that different instances of the Wav2vec2PredictServices point back to the same object (singleton)
     assert wps is wps1
 
     # make a prediction
-    word = wps.predict("test1.wav")
+    word = wps.predict("test1.wav", {"model": "model1", "lm": "4-gram"})
     print(word)

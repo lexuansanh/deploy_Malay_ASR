@@ -157,7 +157,7 @@ if tool_sidebar == "Audio Transcription":
                 st.session_state.predict_arg = {"model": st.session_state.select_model,
                                                 "lm": st.session_state.select_lm}
                 arg_request = json.dumps(st.session_state.predict_arg)
-                response = requests.post(f"{URL}/arg", data=arg_request)
+                response = requests.post(f"{URL}/pattern", data=arg_request)
                 arg_return = response.json()
                 print(st.session_state.predict_arg)
                 print(arg_return)
@@ -280,3 +280,4 @@ if tool_sidebar == "Realtime Recording":
 # st.sidebar.text("NamND40")
 # st.sidebar.text("SanhLX")
 ################################
+#Run "streamlit run Streamlit_app.py"
