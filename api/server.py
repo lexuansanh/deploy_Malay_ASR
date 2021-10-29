@@ -31,7 +31,9 @@ class ModelPattern:
         return {"model": self.model, "lm": self.lm}
 
 
-AUDIO_DIR = "./audio"
+AUDIO_DIR = "./api/audio"
+if not os.path.exists(AUDIO_DIR):
+    os.makedirs(AUDIO_DIR)
 
 # init instance ModelPattern
 model_pattern = ModelPattern("model1", "CTC + 4-gram")

@@ -125,21 +125,21 @@ def init_services(model_pattern):
     if model_pattern not in Wav2vec2PredictServices._instance.keys():
         Wav2vec2PredictServices._instance[model_pattern] = Wav2vec2PredictServices()
         Wav2vec2PredictServices.model[model_pattern] = Wav2Vec2ForCTC.from_pretrained(
-            f"./models/{model_pattern}")
+            f"./api/models/{model_pattern}")
         Wav2vec2PredictServices.processor[model_pattern] = Wav2Vec2Processor.from_pretrained(
-            f"./models/{model_pattern}")
+            f"./api/models/{model_pattern}")
 
         Wav2vec2PredictServices.vocab[model_pattern] = Wav2vec2PredictServices.processor[
             model_pattern].tokenizer.convert_ids_to_tokens(
             range(0, Wav2vec2PredictServices.processor[model_pattern].tokenizer.vocab_size))
         space_ix = Wav2vec2PredictServices.vocab[model_pattern].index('|')
         Wav2vec2PredictServices.vocab[model_pattern][space_ix] = ' '
-        with open(os.path.join(f"./models/{model_pattern}/lm", "config_ctc.yaml"),
+        with open(os.path.join(f"./api/models/{model_pattern}/lm", "config_ctc.yaml"),
                   'r') as config_file:
             Wav2vec2PredictServices.ctc_lm_params[model_pattern] = yaml.load(config_file, Loader=yaml.FullLoader)
         Wav2vec2PredictServices.kenlm_ctcdecoder[model_pattern] = CTCBeamDecoder(
             Wav2vec2PredictServices.vocab[model_pattern],
-            model_path=f"./models/{model_pattern}/lm/malay_lm.bin",
+            model_path=f"./api/models/{model_pattern}/lm/malay_lm.bin",
             alpha=Wav2vec2PredictServices.ctc_lm_params[model_pattern][
                 'alpha'],
             beta=Wav2vec2PredictServices.ctc_lm_params[model_pattern][
