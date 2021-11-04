@@ -139,12 +139,13 @@ class AutoSubVersion(BaseModel):
 async def get_autosub_version(received_data: AutoSubVersion):
     try:
         received_data_version = received_data.dict()
-        if received_data_version is None:
+        if received_data_version is not None:
             status_response = f'Server received autosub version: {received_data_version}'
-            checksum_token = calc_checksum
+            checksum_token = calc_checksum()
             result = {"status": status_response, 'checksum': checksum_token}
+            print(result)
 
-        return jsonable_encoder(result)
+            return jsonable_encoder(result)
 
     except Exception as e:
         print(f"{e}")
@@ -172,7 +173,7 @@ async def post_autosub_transcript_generation(file: UploadFile = File(...)):
     checksum_generation = calc_checksum()
 
     file_name = None
-    if ".wav" in file.filename.lower():
+    if ".mp4" in file.filename.lower():
         file_name = f"{checksum_generation}.mp4"
     else:
         return jsonable_encoder("Video format error")
