@@ -15,7 +15,8 @@ MAX_LENGTH = 160000
 SAMPLE_RATE = 16000
 
 
-# dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+print("device using: ", dev)
 class Wav2vec2PredictServices:
     model = {}
     processor = {}
@@ -48,7 +49,7 @@ class Wav2vec2PredictServices:
             predicts = ""
             inputs = processor(signal, sampling_rate=16_000, return_tensors="pt", padding=True)
             with torch.no_grad():
-                logits = model(inputs.input_values, attention_mask=inputs.attention_mask).logits
+                logits = model(inputs.input_values.to(dev), attention_mask=inputs.attention_mask.to(dev)).logits
 
             # get the predicted label
             if pattern_dict["lm"] == 'CTC':
@@ -62,7 +63,8 @@ class Wav2vec2PredictServices:
             results += " "
             print("pred_label: ", predicts)
         predict_time = time() - start_time
-        # results += f" (predict_time: {predict_time} s)"
+        print(predict_time)
+        #results += f" (predict_time: {predict_time} s)"
 
         return results.strip()
 
@@ -125,7 +127,7 @@ def init_services(model_pattern):
     if model_pattern not in Wav2vec2PredictServices._instance.keys():
         Wav2vec2PredictServices._instance[model_pattern] = Wav2vec2PredictServices()
         Wav2vec2PredictServices.model[model_pattern] = Wav2Vec2ForCTC.from_pretrained(
-            f"./api/models/{model_pattern}")
+            f"./api/models/{model_pattern}").to(dev)
         Wav2vec2PredictServices.processor[model_pattern] = Wav2Vec2Processor.from_pretrained(
             f"./api/models/{model_pattern}")
 
