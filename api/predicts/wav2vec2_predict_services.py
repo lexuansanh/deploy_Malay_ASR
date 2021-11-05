@@ -25,7 +25,7 @@ class Wav2vec2PredictServices:
     kenlm_ctcdecoder = {}
     _instance = {}
 
-    def predict(self, file_path, pattern_dict):
+    def predict(self, file_path, pattern_dict, align=False):
         """
         :param file_path: Path to audio file to predict
         :param pattern_dict: some options about models and lms
@@ -60,6 +60,10 @@ class Wav2vec2PredictServices:
                 pred_with_lm = "".join(vocab[n] for n in beam_results[0][0][:out_lens[0][0]])
                 predicts = pred_with_lm.strip()
             results += predicts
+            #----------------------------------------------------------------
+            if align:
+                results += "\n"
+            #----------------------------------------------------------------
             results += " "
             print("pred_label: ", predicts)
         predict_time = time() - start_time

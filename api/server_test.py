@@ -209,7 +209,76 @@ async def post_autosub_transcript_generation(file: UploadFile = File(...)):
     else:
         return None
 
+class AutoSubVersion(BaseModel):
+    version: str
+    method: str
 
+class AutoSubYouTube(BaseModel):
+    url: str
+
+def download_youtube_video(url, only_audio=False):
+    from pytube import YouTube 
+
+    file_name = calc_checksum()
+    yt = YouTube(url.strip())
+    video = yt.streams
+
+    _video = None
+    output_filename_path = ""
+
+    if only_audio:
+        output_filename_path = os.path.join(AUDIO_AUTOSUB_DIR, file_name)
+        _video = video.filter(only_audio=True).first()
+
+    else:
+        output_filename_path = os.path.join(VIDEO_AUTOSUB_DIR, file_name)
+        _video = video.get_lowest_resolution()
+    
+    if _video is not None and output_filename_path != "":
+        _video.download(output_path=output_filename_path)
+
+        return output_filename_path
+    else:
+        return None
+
+@app.post("/autosub_youtube")
+async def get_autosub_youtube(file: AutoSubYouTube):
+
+    received_url = file['url']
+    file_name = None
+    if received_url != "":
+        file_name = download_youtube_video(received_url)
+    else:
+        return jsonable_encoder("Video format error")
+
+    result = None
+    # take path_file to predicts
+    if file_name is not None:
+        video_cache_file = file_name
+        audio_cache_file = file_name.replace('.mp4', '.wav')
+
+        try:
+            # extract audio from video file
+            extract_audio(video_cache_file, audio_cache_file)
+
+            # take model vs lm to predict
+            pattern_dict = model_pattern.__getitem__()
+
+            # operate prediction
+            wps = init_services(pattern_dict["model"])
+            predicted_word = wps.predict(audio_cache_file, pattern_dict, True)
+
+            # return result for client
+            result = {"word": predicted_word}
+
+        except Exception as e:
+            print(f"{e}")
+            return None
+
+    if result is not None:
+        return jsonable_encoder(result)
+    else:
+        return None
 
 if __name__ == '__main__':
     server = ColabCode(port=10000, password="sanhlx@fsoft", authtoken=NGROK_AUTH_TOKEN, mount_drive=True, code = False)
