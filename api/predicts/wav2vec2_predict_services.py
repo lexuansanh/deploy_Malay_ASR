@@ -64,7 +64,8 @@ class Wav2vec2PredictServices:
             if align:
                 results += "\n"
             #----------------------------------------------------------------
-            results += " "
+            else:
+                results += " "
             print("pred_label: ", predicts)
         predict_time = time() - start_time
         print(predict_time)
