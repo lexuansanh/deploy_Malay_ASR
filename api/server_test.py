@@ -216,6 +216,8 @@ class AutoSubVersion(BaseModel):
 class AutoSubYouTube(BaseModel):
     url: str
 
+from glob import glob
+
 def download_youtube_video(url, only_audio=False):
     from pytube import YouTube 
 
@@ -236,15 +238,20 @@ def download_youtube_video(url, only_audio=False):
     
     if _video is not None and output_filename_path != "":
         _video.download(output_path=output_filename_path)
+        if os.path.isdir(output_filename_path):
+            src_file_name = glob(f"{output_filename_path}/*.mp4")[0]
+            new_file_name = f"{output_filename_path}/{file_name}.mp4"
+            os.rename(src_file_name, new_file_name)
 
-        return output_filename_path
+        return new_file_name
     else:
         return None
 
 @app.post("/autosub_youtube")
 async def get_autosub_youtube(file: AutoSubYouTube):
 
-    received_url = file['url']
+    received_url = file.dict()['url']
+    print(received_url)
     file_name = None
     if received_url != "":
         file_name = download_youtube_video(received_url)

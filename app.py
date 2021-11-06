@@ -64,7 +64,7 @@ if __name__ == "__main__":
     #Home button will be in the middle of the nav list now
     app.add_app("Home", icon="🏠", app=apps.HomeApp(title='Home'),is_home=True)
     app.add_app("Speech to text", icon="🗣️", app=apps.SpeechToTextApp(title='Speech to text'))
-    app.add_app("Realtime ASR", icon="🎙️", app=apps.RealtimeAsrApp(title='Realtime Asr'))
+    app.add_app("VAD Transcriber", icon="🎙️", app=apps.RealtimeAsrApp(title='VAD Transcriber'))
     app.add_app("Enhancement Audio", icon="🎚️", app=apps.HomeApp(title='Enhancement Audio'))
     app.add_app("Speaker Diarization", icon="📼", app=apps.HomeApp(title='Speaker Diarization'))
     app.add_app("Classification", icon="🎛️", app=apps.HomeApp(title='Classification'))
