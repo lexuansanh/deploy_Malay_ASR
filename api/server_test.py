@@ -129,23 +129,35 @@ def predict_pattern(file: Data):
 import random
 from audio_processing import extract_audio
 
+class AutoSubPattern:
+    def __init__(self, method, version):
+        self.method = method
+        self.version = version
+
+    def __setitem__(self, method, version):
+        self.method = method
+        self.version = version
+
+    def __getitem__(self):
+        return {"method": self.method, "version": self.version}
+
+autosub_pattern = AutoSubPattern("upload_video", "basic_version")
+
 def calc_checksum():
     hash = random.getrandbits(128)
     return f"%016x" % hash
 class AutoSubVersion(BaseModel):
+    method: str
     version: str
 
 @app.post("/autosub_version")
 async def get_autosub_version(received_data: AutoSubVersion):
     try:
         received_data_version = received_data.dict()
-        if received_data_version is not None:
-            status_response = f'Server received autosub version: {received_data_version}'
-            checksum_token = calc_checksum()
-            result = {"status": status_response, 'checksum': checksum_token}
-            print(result)
+        autosub_pattern.__setitem__(received_data_version["method"], received_data_version["version"])
+        result = {"result_OK_": autosub_pattern.__getitem__()}
 
-            return jsonable_encoder(result)
+        return jsonable_encoder(result)
 
     except Exception as e:
         print(f"{e}")
@@ -167,7 +179,71 @@ if not os.path.exists(AUDIO_AUTOSUB_DIR):
 if not os.path.exists(OUTPUT_AUTOSUB_DIR):
     os.makedirs(OUTPUT_AUTOSUB_DIR)
 
-@app.post("/autosub_transcript_generation")
+import datetime
+
+def get_timestamp_string(timedelta, format='srt'):
+    """Convert the timedelta into something that can be used by a subtitle file.
+
+    Args:
+        timedelta : timedelta timestmap
+        format : subtitle format
+    """
+    sep = '.' if format == "vtt" else ','
+    # timedelta may be eg, '0:00:14'
+    if '.' in str(timedelta):
+        timestamp = "0" + str(timedelta).split(".")[0] + sep + str(timedelta).split(".")[-1][:3]
+    else:
+        timestamp = "0" + str(timedelta) + sep + "000"
+    return timestamp
+
+
+def generate_one_alignment(line_count, text, time_start, time_end):
+    start_time = datetime.timedelta(seconds=float(time_start))
+    end_time = datetime.timedelta(seconds=float(time_end))
+    
+    _time_start = get_timestamp_string(start_time)
+    _time_end = get_timestamp_string(end_time)
+
+    txt = f"{str(line_count)}\n{_time_start} --> {_time_end}\n{text}\n\n"
+    return txt
+
+
+def generate_many_alignment(alignment_dict):
+    print("generate_many_alignment: ", alignment_dict)
+    text_results = alignment_dict['results']
+    alignment_lst = alignment_dict['predict_alignment']
+
+    autosub_result = ""
+
+    line_count = 0
+    for text, alignment in zip(text_results, alignment_lst):
+        time_start, time_end = alignment
+        print(time_start, time_end)
+        txt = generate_one_alignment(line_count, text, time_start, time_end)
+        autosub_result += txt
+        line_count += 1
+
+    return autosub_result
+
+def generate_srt_file(autosub_result, srt_file_path):
+    try:
+        with open(srt_file_path, "w") as file_handle:
+            file_handle.write(autosub_result)
+            print("Generate srt file to {}".format(srt_file_path))
+
+    except Exception as e:
+        print(f"{e}")
+
+import subprocess
+
+def attach_subtitle_to_video(video_file, srt_file, output_video_file):
+    cmd = f"ffmpeg -i {video_file} -i {srt_file} -c copy -c:s mov_text {output_video_file}"
+    ret = subprocess.call(cmd, shell=True)
+    print("Attach subtitle to video saved to {}".format(output_video_file))
+
+from fastapi.responses import FileResponse
+
+@app.get("/autosub_transcript_generation")
 async def post_autosub_transcript_generation(file: UploadFile = File(...)):
 
     checksum_generation = calc_checksum()
@@ -192,22 +268,50 @@ async def post_autosub_transcript_generation(file: UploadFile = File(...)):
 
             # take model vs lm to predict
             pattern_dict = model_pattern.__getitem__()
+            autosub_dict = autosub_pattern.__getitem__()
 
-            # operate prediction
             wps = init_services(pattern_dict["model"])
-            predicted_word = wps.predict(audio_cache_file, pattern_dict)
+            print("autosub dict: ", autosub_dict)
+            if autosub_dict['version'] == 'advance_version':
+                new_video_file_name = calc_checksum()
+                new_video_file_name = f"{new_video_file_name}.mp4"
+                # print(new_video_file_name)
+                output_video_file = os.path.join(VIDEO_AUTOSUB_DIR, new_video_file_name)
+                # print(output_video_file)
+                srt_file_path = os.path.join(OUTPUT_AUTOSUB_DIR, file_name.replace('.mp4', '.srt'))
+                # print("audio_file: ", audio_cache_file)
+                predicted_word, autosub_prediction = wps.predict(audio_cache_file, pattern_dict, True, True)
+                
+                # print("autosub_prediction: ", autosub_prediction)
+                autosub_result = generate_many_alignment(autosub_prediction)
 
-            # return result for client
-            result = {"word": predicted_word}
+                # print("Generating ", autosub_result)
+                generate_srt_file(autosub_result, srt_file_path)
+
+                # print("Generating ", output_video_file)
+
+                attach_subtitle_to_video(video_cache_file, srt_file_path, output_video_file)
+
+                if os.path.exists(output_video_file):
+                    result = {"word_OK_": predicted_word, 'path': output_video_file}
+                    # return FileResponse(output_video_file, media_type='text/mp4')
+
+            else:
+                # operate prediction
+                predicted_word = wps.predict(audio_cache_file, pattern_dict)
+
+                # return result for client
+                result = {"word_OK_": predicted_word, "path": ""}
+
+            print(result)
+            if result is not None:
+                return jsonable_encoder(result)
+            else:
+                return None
 
         except Exception as e:
             print(f"{e}")
             return None
-
-    if result is not None:
-        return jsonable_encoder(result)
-    else:
-        return None
 
 class AutoSubVersion(BaseModel):
     version: str
@@ -247,7 +351,7 @@ def download_youtube_video(url, only_audio=False):
     else:
         return None
 
-@app.post("/autosub_youtube")
+@app.get("/autosub_youtube")
 async def get_autosub_youtube(file: AutoSubYouTube):
 
     received_url = file.dict()['url']
@@ -270,22 +374,62 @@ async def get_autosub_youtube(file: AutoSubYouTube):
 
             # take model vs lm to predict
             pattern_dict = model_pattern.__getitem__()
+            autosub_dict = autosub_pattern.__getitem__()
 
-            # operate prediction
             wps = init_services(pattern_dict["model"])
-            predicted_word = wps.predict(audio_cache_file, pattern_dict, True)
 
-            # return result for client
-            result = {"word": predicted_word}
+            if autosub_dict['version'] == 'advance_version':
+                new_video_file_name = calc_checksum()
+                new_video_file_name = f"{new_video_file_name}.mp4"
+
+                output_video_file = os.path.join(VIDEO_AUTOSUB_DIR, new_video_file_name)
+
+                srt_file_path = os.path.join(OUTPUT_AUTOSUB_DIR, file_name.replace('.mp4', '.srt'))
+                
+                predicted_word, autosub_prediction = wps.predict(audio_cache_file, pattern_dict, True, True)
+                
+                # print("autosub_prediction: ", autosub_prediction)
+                autosub_result = generate_many_alignment(autosub_prediction)
+
+                # print("Generating ", autosub_result)
+                generate_srt_file(autosub_result, srt_file_path)
+
+                # print("Generating ", output_video_file)
+
+                attach_subtitle_to_video(video_cache_file, srt_file_path, output_video_file)
+
+                if os.path.exists(output_video_file):
+                    result = {"word_OK_": predicted_word, 'path': output_video_file}
+
+            else:
+                # operate prediction
+                predicted_word = wps.predict(audio_cache_file, pattern_dict)
+
+                # return result for client
+                result = {"word_OK_": predicted_word, "path": ""}
+
+            print(result)
+
+            if result is not None:
+                return jsonable_encoder(result)
+            else:
+                return None
 
         except Exception as e:
             print(f"{e}")
             return None
 
-    if result is not None:
-        return jsonable_encoder(result)
+from starlette.responses import FileResponse
+
+@app.get('/download_video_file')
+async def download_video_file(file: AutoSubYouTube):
+    print("file")
+    file_location = file['path']
+    if os.path.exists(file_location):
+        return FileResponse(file_location)
     else:
         return None
+
 
 if __name__ == '__main__':
     server = ColabCode(port=10000, password="sanhlx@fsoft", authtoken=NGROK_AUTH_TOKEN, mount_drive=True, code = False)

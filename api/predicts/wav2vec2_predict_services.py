@@ -25,13 +25,13 @@ class Wav2vec2PredictServices:
     kenlm_ctcdecoder = {}
     _instance = {}
 
-    def predict(self, file_path, pattern_dict, align=False):
+    def predict(self, file_path, pattern_dict, align=True, autosub=False):
         """
         :param file_path: Path to audio file to predict
         :param pattern_dict: some options about models and lms
         :return predicted_keyword (str): Keyword predicted by the models
         """
-
+        print("***Predict***\n", file_path)
         start_time = time()
         # Choice model for prediction
         processor = self.processor[pattern_dict["model"]]
@@ -44,8 +44,18 @@ class Wav2vec2PredictServices:
         array_signal = self._split_array(audio_data)
         results = ""
 
+        print("Split to array: ", len(array_signal))
+
+        #--------------------------------
+        if autosub:
+            autosub_prediction = {'results': [], 'predict_alignment': []}
+            step_time = 0
+            interval_time = 10
+        #--------------------------------
+        print("autosub_prediction: ", autosub_prediction)
         # predict with model and decode
-        for signal in array_signal:
+        for i, signal in enumerate(array_signal):
+            print(f"**index{str(i+1)}**")
             predicts = ""
             inputs = processor(signal, sampling_rate=16_000, return_tensors="pt", padding=True)
             with torch.no_grad():
@@ -59,6 +69,28 @@ class Wav2vec2PredictServices:
                 beam_results, beam_scores, timesteps, out_lens = kenlm_ctcdecoder.decode(logits)
                 pred_with_lm = "".join(vocab[n] for n in beam_results[0][0][:out_lens[0][0]])
                 predicts = pred_with_lm.strip()
+
+                #----------------------------------------------------------------
+                if autosub:
+                    if predicts != "":
+                        alignment = list()
+
+                        for i in range(0, out_lens[0][0]):
+                            alignment.append([pred_with_lm[i], int(timesteps[0][0][i])])
+
+                        timesteps = int(beam_results.shape[2])
+                        timestep_length = librosa.get_duration(signal) / timesteps
+                        for a in alignment:
+                            a[1] = a[1] * timestep_length
+                        time_start = alignment[0][1] + step_time*interval_time
+                        time_end = alignment[-1][1] + step_time*interval_time
+                        align_time = (time_start, time_end)
+                        autosub_prediction['results'].append(predicts)
+                        autosub_prediction['predict_alignment'].append(align_time)
+                    
+                    step_time += 1
+                #----------------------------------------------------------------
+
             results += predicts
             #----------------------------------------------------------------
             if align:
@@ -67,9 +99,15 @@ class Wav2vec2PredictServices:
             else:
                 results += " "
             print("pred_label: ", predicts)
+            print("time: ", align_time)
         predict_time = time() - start_time
         print(predict_time)
-        #results += f" (predict_time: {predict_time} s)"
+        # results += f" (predict_time: {predict_time} s)"
+
+        #--------------------------------
+        if autosub:
+            return results, autosub_prediction
+        #--------------------------------
 
         return results.strip()
 
