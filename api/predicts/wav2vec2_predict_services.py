@@ -44,7 +44,7 @@ class Wav2vec2PredictServices:
         array_signal = self._split_array(audio_data)
         results = ""
 
-        print("Split to array: ", len(array_signal))
+        # print("Split to array: ", len(array_signal))
 
         #--------------------------------
         if autosub:
@@ -52,7 +52,7 @@ class Wav2vec2PredictServices:
             step_time = 0
             interval_time = 10
         #--------------------------------
-        print("autosub_prediction: ", autosub_prediction)
+        # print("autosub_prediction: ", autosub_prediction)
         # predict with model and decode
         for i, signal in enumerate(array_signal):
             print(f"**index{str(i+1)}**")
@@ -99,7 +99,7 @@ class Wav2vec2PredictServices:
             else:
                 results += " "
             print("pred_label: ", predicts)
-            print("time: ", align_time)
+            # print("time: ", align_time)
         predict_time = time() - start_time
         print(predict_time)
         # results += f" (predict_time: {predict_time} s)"

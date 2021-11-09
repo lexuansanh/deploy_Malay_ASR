@@ -218,7 +218,7 @@ def generate_many_alignment(alignment_dict):
     line_count = 0
     for text, alignment in zip(text_results, alignment_lst):
         time_start, time_end = alignment
-        print(time_start, time_end)
+        # print(time_start, time_end)
         txt = generate_one_alignment(line_count, text, time_start, time_end)
         autosub_result += txt
         line_count += 1
@@ -384,7 +384,7 @@ async def get_autosub_youtube(file: AutoSubYouTube):
 
                 output_video_file = os.path.join(VIDEO_AUTOSUB_DIR, new_video_file_name)
 
-                srt_file_path = os.path.join(OUTPUT_AUTOSUB_DIR, file_name.replace('.mp4', '.srt'))
+                srt_file_path = os.path.join(OUTPUT_AUTOSUB_DIR, new_video_file_name.replace('.mp4', '.srt'))
                 
                 predicted_word, autosub_prediction = wps.predict(audio_cache_file, pattern_dict, True, True)
                 
